@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;  // Use the same version as Uniswap V3 Core
-
+pragma solidity ^0.7.6;
 
 // Import Uniswap V3 Core contracts using the correct paths
-import "../lib/v3-core/contracts/UniswapV3Factory.sol";
-import "../lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import "../lib/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import "../lib/v3-core/contracts/libraries/PoolAddress.sol";
+import "v3-core/contracts/UniswapV3Factory.sol";
+import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "v3-core/contracts/libraries/PoolAddress.sol";
+
 
 // OpenZeppelin ERC20 implementation
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
@@ -48,10 +48,17 @@ contract CustomPoolSwap is Test {
         // Approve the pool to spend tokens
         tokenA.approve(address(pool), amountToSwap);
 
-        // Perform the token swap
-        pool.swap(address(this), true, int256(amountToSwap), 0, "");
+        // Perform the token swap (true indicates tokenA to tokenB, false is the opposite)
+        // The 0 value for `sqrtPriceLimitX96` means no price limit
+        pool.swap(
+            address(this),  // The address performing the swap
+            true,           // TokenA -> TokenB
+            int256(amountToSwap),  // Amount to swap (positive for exact input swap)
+            0,              // No price limit (price range for the swap)
+            ""              // No additional data
+        );
 
-        // Ensure the swap was successful (you can adjust this logic based on your needs)
+        // Ensure the swap was successful by checking the balance of TokenB after swap
         uint256 balanceAfter = tokenB.balanceOf(address(this));
         assert(balanceAfter > 0);  // Ensure we have received tokens after the swap
     }
