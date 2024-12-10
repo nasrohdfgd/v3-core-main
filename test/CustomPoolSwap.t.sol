@@ -1,85 +1,58 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.7.6;  // Use the same version as Uniswap V3 Core
 
-// Import necessary contracts from Uniswap V3 core and OpenZeppelin
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+// Import Uniswap V3 Core contracts using the correct paths
+import "../lib/v3-core/contracts/UniswapV3Factory.sol";
+import "../lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "../lib/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "../lib/v3-core/contracts/libraries/PoolAddress.sol";
+
+// OpenZeppelin ERC20 implementation
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+
+// Import Foundry's test library
 import "forge-std/Test.sol";
-import "@uniswap/v3-core/contracts/UniswapV3Factory.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import "@uniswap/v3-core/contracts/libraries/PoolAddress.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
+contract MyCustomToken is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {
+        _mint(msg.sender, 1000000 * 10**18);  // Mint 1 million tokens
+    }
+}
 
 contract CustomPoolSwap is Test {
-    // Define custom ERC20 token
-    ERC20 public tokenA;
-    ERC20 public tokenB;
-
-    // Define Uniswap V3 factory and pool variables
-    IUniswapV3Factory public factory;
+    MyCustomToken public tokenA;
+    MyCustomToken public tokenB;
+    UniswapV3Factory public factory;
     IUniswapV3Pool public pool;
 
-    // Deploy the Uniswap V3 factory and the custom tokens in the setUp function
     function setUp() public {
-        // Deploy Uniswap V3 factory
+        // Deploy two custom ERC20 tokens
+        tokenA = new MyCustomToken("Token A", "TKA");
+        tokenB = new MyCustomToken("Token B", "TKB");
+
+        // Deploy the Uniswap V3 Factory contract
         factory = new UniswapV3Factory();
 
-        // Deploy two custom ERC20 tokens
-        tokenA = new ERC20("MyCustomTokenA", "MCTA");
-        tokenB = new ERC20("MyCustomTokenB", "MCTB");
+        // Create the pool with a fee of 0.3% (3000)
+        factory.createPool(address(tokenA), address(tokenB), 3000);
 
-        // Mint some initial tokens for the contract
-        tokenA.mint(address(this), 1000 * 10**18);
-        tokenB.mint(address(this), 1000 * 10**18);
-
-        // Create a pool with a 0.3% fee
-        uint24 fee = 3000;  // Uniswap V3 0.3% fee
-        factory.createPool(address(tokenA), address(tokenB), fee);
-
-        // Get the pool address and cast it to IUniswapV3Pool
-        address poolAddress = factory.getPool(address(tokenA), address(tokenB), fee);
+        // Get the pool address
+        address poolAddress = factory.getPool(address(tokenA), address(tokenB), 3000);
         pool = IUniswapV3Pool(poolAddress);
     }
 
-    // Define the testSwap function
     function testSwap() public {
-        // Approve the pool to spend tokenA and tokenB
-        tokenA.approve(address(pool), 1000 * 10**18);
-        tokenB.approve(address(pool), 1000 * 10**18);
+        uint256 amountToSwap = 1000 * 10**18; // Define the amount to swap (e.g., 1000 tokens)
 
-        // Mint the required tokens into the pool for swap
-        // These minting steps depend on the pool setup and the liquidity provider, so for simplicity, let's assume minting is done correctly.
+        // Approve the pool to spend tokens
+        tokenA.approve(address(pool), amountToSwap);
 
-        // Perform the swap (this will involve calling the swap function)
-        uint256 amountIn = 100 * 10**18;
-        uint256 amountOutMin = 1 * 10**18;
+        // Perform the token swap
+        pool.swap(address(this), true, int256(amountToSwap), 0, "");
 
-        (uint256 amountOut) = swapExactTokensForTokens(amountIn, amountOutMin);
-
-        // Check the received token amount to ensure correct swap behavior
-        assert(amountOut >= amountOutMin);
-    }
-
-    // Swap function for exact token swap
-    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin) public returns (uint256 amountOut) {
-        // Your swap logic with Uniswap V3 should go here
-        // For simplicity, we're assuming the swap works, and returns the correct output amount
-
-        // This would invoke the swap method from the Uniswap V3 Pool, using the relevant parameters
-        (bool success, bytes memory data) = address(pool).call(
-            abi.encodeWithSignature(
-                "swap(address,uint256,uint256,uint256,uint256,bytes)",
-                address(this),
-                amountIn,
-                amountOutMin,
-                amountIn, // You'd adjust this with proper data based on swap type
-                0, // Adjust this as necessary based on Uniswap V3 API
-                ""
-            )
-        );
-        require(success, "Swap failed");
-
-        // For the sake of this example, we assume `amountOut` is passed correctly
-        return amountIn;
+        // Ensure the swap was successful (you can adjust this logic based on your needs)
+        uint256 balanceAfter = tokenB.balanceOf(address(this));
+        assert(balanceAfter > 0);  // Ensure we have received tokens after the swap
     }
 }
